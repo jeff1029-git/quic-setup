@@ -1,6 +1,6 @@
 
 # The profile for experimenting with QUIC protocol  
-# Updated for a 6-node topology with 2 link bridges.
+# Updated for a 6-node topology with 2 link bridges. Python 2 compatible.
 
 import geni.portal as portal
 import geni.rspec.pg as pg
@@ -84,21 +84,19 @@ link_c2 = request.Link("link_c2")
 link_c2.addInterface(c2_iface)
 link_c2.addInterface(b2_c2)
 
-# Core connection between bridges
 link_core = request.Link("link_core")
 link_core.addInterface(b1_core)
 link_core.addInterface(b2_core)
 
-# Services
 project = params.project
 for node in [server1, server2, client1, client2]:
-    node.addService(pg.Execute(shell="sh", command=f"export PROJECT={project} QUIC_VERSION={params.quic_version} && /local/repository/scripts/install-deps.sh"))
+    node.addService(pg.Execute(shell="sh", command="export PROJECT={} QUIC_VERSION={} && /local/repository/scripts/install-deps.sh".format(project, params.quic_version)))
 
 server1.addService(pg.Execute(shell="sh", command="/local/repository/scripts/install-apache.sh"))
 server2.addService(pg.Execute(shell="sh", command="/local/repository/scripts/install-apache.sh"))
 
-client1.addService(pg.Execute(shell="sh", command=f"export QUIC_VERSION={params.quic_version} && /local/repository/scripts/install-client.sh"))
-client2.addService(pg.Execute(shell="sh", command=f"export QUIC_VERSION={params.quic_version} && /local/repository/scripts/install-client.sh"))
+client1.addService(pg.Execute(shell="sh", command="export QUIC_VERSION={} && /local/repository/scripts/install-client.sh".format(params.quic_version)))
+client2.addService(pg.Execute(shell="sh", command="export QUIC_VERSION={} && /local/repository/scripts/install-client.sh".format(params.quic_version)))
 
 bridge1.addService(pg.Execute(shell="sh", command="/local/repository/scripts/bridge-tunning.sh"))
 bridge2.addService(pg.Execute(shell="sh", command="/local/repository/scripts/bridge-tunning.sh"))
