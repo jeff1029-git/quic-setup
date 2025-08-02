@@ -1,96 +1,106 @@
-"""# The profile for experimenting with QUIC protocol  
-The profile has three nodes: **server**, **client** and **link**.
-The Execute script install required packages for running experiments.
 
-Instructions:
-After the experiment is instatiated, 
-Start running example server from server node,
-and example client from client node.
-"""
+# The profile for experimenting with QUIC protocol  
+# Updated for a 6-node topology with 2 link bridges.
 
-
-# Import the Portal object.
 import geni.portal as portal
-# Import the ProtoGENI library.
 import geni.rspec.pg as pg
-# Import the emulab extensions library. (BridgedLink)
 import geni.rspec.emulab as emulab
 
-# Create a portal context, needed to defined parameters
 pc = portal.Context()
-
-# Create a Request object to start building the RSpec.
 request = pc.makeRequestRSpec()
 
-# Describe the parameter(s) this profile script can accept.
-# quic_version is used to decide which OS version, chrome-har-capturer version is used.
-pc.defineParameter( "quic_version", "Specify the quic version to setup (Q037, RFCv1)", portal.ParameterType.STRING, "RFCv1" )
-# project is used to specify the project path to give permissions to apache server.
-pc.defineParameter( "project", "Specify the emulab project name", portal.ParameterType.STRING, "FEC-HTTP" )
+pc.defineParameter("quic_version", "Specify the quic version to setup (Q037, RFCv1)", portal.ParameterType.STRING, "RFCv1")
+pc.defineParameter("project", "Specify the emulab project name", portal.ParameterType.STRING, "FEC-HTTP")
 
-# Retrieve the values the user specifies during instantiation.
 params = pc.bindParameters()
-
-# Check parameter validity.
-# Add custom conditions here
 valid_versions = ["Q037", "RFCv1"]
 if params.quic_version not in valid_versions:
-    error = portal.ParameterError("Invalid quic_version. It should be either 'Q037' or 'RFCv1'.", ['quic_version'])
-    pc.reportError(error)
-
-# this function will spit out some nice JSON-formatted exception info on stderr
+    pc.reportError(portal.ParameterError("Invalid quic_version. It should be either 'Q037' or 'RFCv1'.", ['quic_version']))
 pc.verifyParameters()
-
-# Add a raw PC to the request.
-server = request.RawPC("server")
-# d430 -> 64GB ECC Memory, Two Intel E5-2630v3 8-Core CPUs at 2.4 GHz (Haswell)
-server.hardware_type = 'd430'
-# https://docs.emulab.net/advanced-topics.html , Public IP Access
-# server.routable_control_ip = True
-iface1 = server.addInterface()
-# Specify the IPv4 address
-iface1.addAddress(pg.IPv4Address("192.168.1.1", "255.255.255.0"))
-
-client = request.RawPC("client")
-# d710 -> 12 GB memory, 2.4 GHz quad-core
-client.hardware_type = 'd710'
-# client.routable_control_ip = True
-iface2 = client.addInterface()
-# Specify the IPv4 address
-iface2.addAddress(pg.IPv4Address("192.168.1.2", "255.255.255.0"))
 
 ubuntu_22 = "urn:publicid:IDN+emulab.net+image+emulab-ops//UBUNTU22-64-STD"
 ubuntu_18 = "urn:publicid:IDN+emulab.net+image+emulab-ops//UBUNTU18-64-STD"
 fbsd_image = "urn:publicid:IDN+emulab.net+image+emulab-ops:FBSD132-64-STD"
-
-# Request that a specific image be installed on this node
 ubuntu_image = ubuntu_22 if params.quic_version == 'RFCv1' else ubuntu_18
-server.disk_image = ubuntu_image
-client.disk_image = ubuntu_image
 
-# Create the bridged link between the two nodes.
-link = request.BridgedLink("link")
-link.bridge.hardware_type = 'd710'
-# Add the interfaces we created above.
-link.addInterface(iface1)
-link.addInterface(iface2)
+# SERVER 1
+server1 = request.RawPC("server1")
+server1.hardware_type = "d430"
+server1.disk_image = ubuntu_image
+s1_iface = server1.addInterface("s1_iface")
+s1_iface.addAddress(pg.IPv4Address("192.168.1.1", "255.255.255.0"))
 
-link.bridge.disk_image = fbsd_image
+# SERVER 2
+server2 = request.RawPC("server2")
+server2.hardware_type = "d430"
+server2.disk_image = ubuntu_image
+s2_iface = server2.addInterface("s2_iface")
+s2_iface.addAddress(pg.IPv4Address("192.168.1.2", "255.255.255.0"))
 
-# Give bridge some shaping parameters. (Implict parameter found in real link)
-# link.bandwidth = 10000
-# link.latency   = 36  # Implicit latency in live network link (IMC'17)
+# CLIENT 1
+client1 = request.RawPC("client1")
+client1.hardware_type = "d710"
+client1.disk_image = ubuntu_image
+c1_iface = client1.addInterface("c1_iface")
+c1_iface.addAddress(pg.IPv4Address("192.168.2.1", "255.255.255.0"))
 
-# pass variable to script
+# CLIENT 2
+client2 = request.RawPC("client2")
+client2.hardware_type = "d710"
+client2.disk_image = ubuntu_image
+c2_iface = client2.addInterface("c2_iface")
+c2_iface.addAddress(pg.IPv4Address("192.168.2.2", "255.255.255.0"))
+
+# LINK BRIDGE 1
+bridge1 = request.RawPC("bridge1")
+bridge1.hardware_type = "d710"
+bridge1.disk_image = fbsd_image
+b1_s1 = bridge1.addInterface("b1_s1")
+b1_s2 = bridge1.addInterface("b1_s2")
+b1_core = bridge1.addInterface("b1_core")
+
+# LINK BRIDGE 2
+bridge2 = request.RawPC("bridge2")
+bridge2.hardware_type = "d710"
+bridge2.disk_image = fbsd_image
+b2_c1 = bridge2.addInterface("b2_c1")
+b2_c2 = bridge2.addInterface("b2_c2")
+b2_core = bridge2.addInterface("b2_core")
+
+# Connections
+link_s1 = request.Link("link_s1")
+link_s1.addInterface(s1_iface)
+link_s1.addInterface(b1_s1)
+
+link_s2 = request.Link("link_s2")
+link_s2.addInterface(s2_iface)
+link_s2.addInterface(b1_s2)
+
+link_c1 = request.Link("link_c1")
+link_c1.addInterface(c1_iface)
+link_c1.addInterface(b2_c1)
+
+link_c2 = request.Link("link_c2")
+link_c2.addInterface(c2_iface)
+link_c2.addInterface(b2_c2)
+
+# Core connection between bridges
+link_core = request.Link("link_core")
+link_core.addInterface(b1_core)
+link_core.addInterface(b2_core)
+
+# Services
 project = params.project
-# Install and execute a script that is contained in the repository.
-server.addService(pg.Execute(shell="sh", command="export PROJECT="+ project + " QUIC_VERSION="+ params.quic_version +" && /local/repository/scripts/install-deps.sh"))
-client.addService(pg.Execute(shell="sh", command="export PROJECT="+ project + " QUIC_VERSION="+ params.quic_version +" && /local/repository/scripts/install-deps.sh"))
+for node in [server1, server2, client1, client2]:
+    node.addService(pg.Execute(shell="sh", command=f"export PROJECT={project} QUIC_VERSION={params.quic_version} && /local/repository/scripts/install-deps.sh"))
 
-# Install specific packages
-server.addService(pg.Execute(shell="sh", command="/local/repository/scripts/install-apache.sh"))
-client.addService(pg.Execute(shell="sh", command="export QUIC_VERSION="+ params.quic_version +" && /local/repository/scripts/install-client.sh"))
-link.bridge.addService(pg.Execute(shell="sh", command="/local/repository/scripts/bridge-tunning.sh"))
+server1.addService(pg.Execute(shell="sh", command="/local/repository/scripts/install-apache.sh"))
+server2.addService(pg.Execute(shell="sh", command="/local/repository/scripts/install-apache.sh"))
 
-# Print the RSpec to the enclosing page.
+client1.addService(pg.Execute(shell="sh", command=f"export QUIC_VERSION={params.quic_version} && /local/repository/scripts/install-client.sh"))
+client2.addService(pg.Execute(shell="sh", command=f"export QUIC_VERSION={params.quic_version} && /local/repository/scripts/install-client.sh"))
+
+bridge1.addService(pg.Execute(shell="sh", command="/local/repository/scripts/bridge-tunning.sh"))
+bridge2.addService(pg.Execute(shell="sh", command="/local/repository/scripts/bridge-tunning.sh"))
+
 pc.printRequestRSpec(request)
