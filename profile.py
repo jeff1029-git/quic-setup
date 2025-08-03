@@ -54,11 +54,25 @@ b2_c1 = bridge2.addInterface("b2_c1")
 b2_c2 = bridge2.addInterface("b2_c2")
 b2_core = bridge2.addInterface("b2_core")
 
-request.Link("link_s1").addInterface(s1_iface).addInterface(b1_s1)
-request.Link("link_s2").addInterface(s2_iface).addInterface(b1_s2)
-request.Link("link_c1").addInterface(c1_iface).addInterface(b2_c1)
-request.Link("link_c2").addInterface(c2_iface).addInterface(b2_c2)
-request.Link("link_core").addInterface(b1_core).addInterface(b2_core)
+link_s1 = request.Link("link_s1")
+link_s1.addInterface(s1_iface)
+link_s1.addInterface(b1_s1)
+
+link_s2 = request.Link("link_s2")
+link_s2.addInterface(s2_iface)
+link_s2.addInterface(b1_s2)
+
+link_c1 = request.Link("link_c1")
+link_c1.addInterface(c1_iface)
+link_c1.addInterface(b2_c1)
+
+link_c2 = request.Link("link_c2")
+link_c2.addInterface(c2_iface)
+link_c2.addInterface(b2_c2)
+
+link_core = request.Link("link_core")
+link_core.addInterface(b1_core)
+link_core.addInterface(b2_core)
 
 project = params.project
 for node in [server1, server2, client1, client2]:
