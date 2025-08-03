@@ -1,6 +1,6 @@
 
 # The profile for experimenting with QUIC protocol  
-# Updated for a 6-node topology with 2 link bridges. Python 2 compatible.
+# Updated for 6-node QUIC topology with Python 2 compatibility and IPs only on host interfaces
 
 import geni.portal as portal
 import geni.rspec.pg as pg
