@@ -10,51 +10,65 @@ pc.defineParameter("quic_version", "Specify the quic version to setup (Q037, RFC
 pc.defineParameter("project", "Specify the emulab project name", portal.ParameterType.STRING, "FEC-HTTP")
 
 params = pc.bindParameters()
+valid_versions = ["Q037", "RFCv1"]
+if params.quic_version not in valid_versions:
+    pc.reportError(portal.ParameterError("Invalid quic_version. It should be either 'Q037' or 'RFCv1'.", ['quic_version']))
 pc.verifyParameters()
 
-# Define basic images
-ubuntu_image = "urn:publicid:IDN+emulab.net+image+emulab-ops//UBUNTU22-64-STD"
+ubuntu_22 = "urn:publicid:IDN+emulab.net+image+emulab-ops//UBUNTU22-64-STD"
+ubuntu_18 = "urn:publicid:IDN+emulab.net+image+emulab-ops//UBUNTU18-64-STD"
 fbsd_image = "urn:publicid:IDN+emulab.net+image+emulab-ops:FBSD132-64-STD"
+ubuntu_image = ubuntu_22 if params.quic_version == 'RFCv1' else ubuntu_18
 
-# Setup hosts with IPs
 server1 = request.RawPC("server1")
+server1.hardware_type = "d430"
 server1.disk_image = ubuntu_image
-s1 = server1.addInterface()
-s1.addAddress(pg.IPv4Address("192.168.1.1", "255.255.255.0"))
+s1_iface = server1.addInterface("s1_iface")
 
 server2 = request.RawPC("server2")
+server2.hardware_type = "d430"
 server2.disk_image = ubuntu_image
-s2 = server2.addInterface()
-s2.addAddress(pg.IPv4Address("192.168.1.2", "255.255.255.0"))
+s2_iface = server2.addInterface("s2_iface")
 
 client1 = request.RawPC("client1")
+client1.hardware_type = "d710"
 client1.disk_image = ubuntu_image
-c1 = client1.addInterface()
-c1.addAddress(pg.IPv4Address("192.168.2.1", "255.255.255.0"))
+c1_iface = client1.addInterface("c1_iface")
 
 client2 = request.RawPC("client2")
+client2.hardware_type = "d710"
 client2.disk_image = ubuntu_image
-c2 = client2.addInterface()
-c2.addAddress(pg.IPv4Address("192.168.2.2", "255.255.255.0"))
+c2_iface = client2.addInterface("c2_iface")
 
-# Setup bridges (no IPs)
 bridge1 = request.RawPC("bridge1")
+bridge1.hardware_type = "d710"
 bridge1.disk_image = fbsd_image
-b1_1 = bridge1.addInterface()
-b1_2 = bridge1.addInterface()
-b1_core = bridge1.addInterface()
+b1_s1 = bridge1.addInterface("b1_s1")
+b1_s2 = bridge1.addInterface("b1_s2")
+b1_core = bridge1.addInterface("b1_core")
 
 bridge2 = request.RawPC("bridge2")
+bridge2.hardware_type = "d710"
 bridge2.disk_image = fbsd_image
-b2_1 = bridge2.addInterface()
-b2_2 = bridge2.addInterface()
-b2_core = bridge2.addInterface()
+b2_c1 = bridge2.addInterface("b2_c1")
+b2_c2 = bridge2.addInterface("b2_c2")
+b2_core = bridge2.addInterface("b2_core")
 
-# Create links (mixed IP/no IP still causes issues)
-request.Link("link_s1").addInterface(s1).addInterface(b1_1)
-request.Link("link_s2").addInterface(s2).addInterface(b1_2)
-request.Link("link_c1").addInterface(c1).addInterface(b2_1)
-request.Link("link_c2").addInterface(c2).addInterface(b2_2)
+request.Link("link_s1").addInterface(s1_iface).addInterface(b1_s1)
+request.Link("link_s2").addInterface(s2_iface).addInterface(b1_s2)
+request.Link("link_c1").addInterface(c1_iface).addInterface(b2_c1)
+request.Link("link_c2").addInterface(c2_iface).addInterface(b2_c2)
 request.Link("link_core").addInterface(b1_core).addInterface(b2_core)
+
+project = params.project
+for node in [server1, server2, client1, client2]:
+    node.addService(pg.Execute(shell="sh", command="export PROJECT={} QUIC_VERSION={} && /local/repository/scripts/install-deps.sh".format(project, params.quic_version)))
+
+server1.addService(pg.Execute(shell="sh", command="/local/repository/scripts/install-apache.sh"))
+server2.addService(pg.Execute(shell="sh", command="/local/repository/scripts/install-apache.sh"))
+client1.addService(pg.Execute(shell="sh", command="export QUIC_VERSION={} && /local/repository/scripts/install-client.sh".format(params.quic_version)))
+client2.addService(pg.Execute(shell="sh", command="export QUIC_VERSION={} && /local/repository/scripts/install-client.sh".format(params.quic_version)))
+bridge1.addService(pg.Execute(shell="sh", command="/local/repository/scripts/bridge-tunning.sh"))
+bridge2.addService(pg.Execute(shell="sh", command="/local/repository/scripts/bridge-tunning.sh"))
 
 pc.printRequestRSpec(request)
